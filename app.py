@@ -1,44 +1,56 @@
-from aiohttp import web 
+import openai_secret_manager
+from aiohttp import web
+from aiogram import Bot, Dispatcher, types
+import re
 
-from aiogram import Bot,Dispatcher,executor,types
-from aiogram.types import InlineKeyboardMarkup,InlineKeyboardButton,ReplyKeyboardMarkup,ReplyKeyboardRemove,KeyboardButton
+async def validate_tax_string(input_string):
+    tax_pattern = r'\b(tax|taxes|taxable|deduction|income tax|sales tax)\b'
+    return bool(re.search(tax_pattern, input_string, re.IGNORECASE))
 
-import telebot
+async def generate_chatgpt_response(message):
+    # Load OpenAI API key from the secret manager
+    secret_name = "openai"
+    secret = openai_secret_manager.get_secret(secret_name)
+    api_key = secret.get("api_key")
 
+    # Initialize ChatGPT
+    from openai import ChatCompletion
+    chatgpt = ChatCompletion(api_key=api_key)
 
-token = "6417872030:AAG352xW0_9oyEngmdvV8pZ3GDo92kA319w"
-bot1 = Bot(token)
-Bot.set_current(bot1)
+    # Generate response
+    response = chatgpt.complete(prompt=message, max_tokens=50)
 
-dispatcher = Dispatcher(bot1)
+    return response.choices[0].text.strip()
 
-app=web.Application()
-
-webhook_path = f'/{token}'
+TOKEN = "6417872030:AAG352xW0_9oyEngmdvV8pZ3GDo92kA319w"
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot)
 
 async def set_webhook():
-    webhook_uri = f'https://sweeping-peacock-locally.ngrok-free.app{webhook_path}'
-    await bot1.set_webhook(
-        webhook_uri
-    )
-    
+    webhook_uri = f'https://your-webhook-url/{TOKEN}'
+    await bot.set_webhook(webhook_uri)
+
 async def on_startup(_):
     await set_webhook()
 
-    
-bot = telebot.TeleBot(token)
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message):
+    await message.answer("Let's start")
 
-@dispatcher.message_handler(commands = ['start'])
-async def fun(message:types.Message):
-    print(message)
-    await bot1.send_message(message.chat.id,"let's start")
+@dp.message_handler(commands=['about'])
+async def about(message: types.Message):
+    await message.answer("This bot is developed by Divyanshu Sharma")
 
-@dispatcher.message_handler(commands = ['about'])
-async def about(message:types.Message):
-    print(message)
-    await bot1.send_message(message.chat.id,"this bot is developed by divyanshu sharma")
-    
-@dispatcher.message_handler(content_types=[
+@dp.message_handler(content_types=[types.ContentType.TEXT])
+async def on_message_received(message: types.Message):
+    if await validate_tax_string(message.text):
+        await message.answer("This bot is developed by Divyanshu Sharma")
+    else:
+        # Generate response using ChatGPT
+        response = await generate_chatgpt_response(message.text)
+        await message.answer(response)
+
+@dp.message_handler(content_types=[
     types.ContentType.PHOTO,
     types.ContentType.DOCUMENT,
     types.ContentType.AUDIO,
@@ -50,33 +62,24 @@ async def about(message:types.Message):
     types.ContentType.POLL,
 ])
 async def on_other_message(message: types.Message):
-    await message.answer("Sorry, I cannot process images, files, or other types of content. i am sepecially designed to answer the tax related queries")
+    await message.answer("Sorry, I cannot process images, files, or other types of content. I am specially designed to answer tax-related queries.")
 
 async def handle_webhook(request):
     url = str(request.url)
-    index = url.rfind('/')
-    token = url[index+1:]
-    print("running")
-    if token == token:
+    token_index = url.rfind('/')
+    token = url[token_index + 1:]
+    print(request)
+    if token == TOKEN:
         update = types.Update(**await request.json())
-        await dispatcher.process_update(update)
-        
+        await dp.process_update(update)
         return web.Response()
     else:
         return web.Response(status=403)
 
-
-
-
-
-
-app.router.add_post(f'/{token}', handler=handle_webhook)
+app = web.Application()
+app.router.add_post(f'/{TOKEN}', handle_webhook)
+app.router.add_get("/", handle_webhook)
 
 if __name__ == "__main__":
     app.on_startup.append(on_startup)
-    
-    web.run_app(
-        app,
-        host='0.0.0.0',
-        port='5000'
-    )
+    web.run_app(app, host='0.0.0.0', port=5000)

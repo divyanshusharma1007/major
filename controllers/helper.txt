@@ -1,1 +1,0 @@
-this folder holds  the logic which are going to be run as per of the request 

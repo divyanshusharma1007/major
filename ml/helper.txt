@@ -1,2 +1,0 @@
-this folder contains macine learning models wraped with the functions 
-traing data base also reside inside this folder 
