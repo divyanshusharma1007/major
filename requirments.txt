@@ -1,0 +1,4 @@
+aiohttp==3.8.1
+aiogram==3.16.0
+openai==0.12.5
+openai_secret_manager==0.3.0

@@ -1,6 +1,6 @@
-import openai_secret_manager
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
+from openai import ChatCompletion  # Import openai module
 import re
 
 async def validate_tax_string(input_string):
@@ -8,18 +8,9 @@ async def validate_tax_string(input_string):
     return bool(re.search(tax_pattern, input_string, re.IGNORECASE))
 
 async def generate_chatgpt_response(message):
-    # Load OpenAI API key from the secret manager
-    secret_name = "openai"
-    secret = openai_secret_manager.get_secret(secret_name)
-    api_key = secret.get("api_key")
-
-    # Initialize ChatGPT
-    from openai import ChatCompletion
+    api_key = "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"
     chatgpt = ChatCompletion(api_key=api_key)
-
-    # Generate response
     response = chatgpt.complete(prompt=message, max_tokens=50)
-
     return response.choices[0].text.strip()
 
 TOKEN = "6417872030:AAG352xW0_9oyEngmdvV8pZ3GDo92kA319w"
@@ -27,7 +18,7 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
 async def set_webhook():
-    webhook_uri = f'https://your-webhook-url/{TOKEN}'
+    webhook_uri = "https://example.com/your_webhook_path"  # Update with your webhook URL
     await bot.set_webhook(webhook_uri)
 
 async def on_startup(_):
@@ -46,7 +37,6 @@ async def on_message_received(message: types.Message):
     if await validate_tax_string(message.text):
         await message.answer("This bot is developed by Divyanshu Sharma")
     else:
-        # Generate response using ChatGPT
         response = await generate_chatgpt_response(message.text)
         await message.answer(response)
 
@@ -68,7 +58,6 @@ async def handle_webhook(request):
     url = str(request.url)
     token_index = url.rfind('/')
     token = url[token_index + 1:]
-    print(request)
     if token == TOKEN:
         update = types.Update(**await request.json())
         await dp.process_update(update)
